@@ -25,10 +25,10 @@ const teacherSchema = new mongoose.Schema({
         type: String,
         required: true, 
     },
-    teacherPhoto:{
+    teacherPhotoUrl:{
         type:String
     },
-    IP:{
+    teacherFace:{
         type:String
     }
 })

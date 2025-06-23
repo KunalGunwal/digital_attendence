@@ -4,6 +4,7 @@ import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import jwt from "jsonwebtoken"
+import { uploadOnCloudinary,deleteFromCloudinary } from "../utils/cloudinary.js";
 
 
 const addTeacher = asyncHandler(async (req,res)=>{
@@ -27,39 +28,6 @@ const addTeacher = asyncHandler(async (req,res)=>{
         new ApiResponse(200,teacher,"teacher added successfully")
     )
 
-})
-
-
-const saveIP = asyncHandler(async (req,res)=>{
-    const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
-    const teacher = req.teacher
-    const teacherId = teacher.teacherId
-    if (!teacherId) {
-        throw new ApiError(400, "Teacher ID is required to save IP address.");
-    }
-    if (!clientIp) {
-        throw new ApiError(500, "Could not determine client IP address.");
-    }
-
-    const updatedTeacher = await Teacher.findOneAndUpdate(
-        {
-            teacherId:teacherId
-        },
-        {
-            IP:clientIp
-        },
-        {
-            new:true, runValidators:true
-        }
-    )
-
-    if(!updatedTeacher){
-        throw new ApiError(404, "Teacher not found.");
-    }
-
-    return res.status(200).json(
-        new ApiResponse(200,updatedTeacher,"IP saved successfully")
-    )
 })
 
 
@@ -102,4 +70,51 @@ const getCurrentTeacher = asyncHandler(async (req, res) => {
 });
 
 
-export {addTeacher,loginTeacher,saveIP,getCurrentTeacher}
+const uploadTeacherPhoto = asyncHandler(async (req, res) => {
+    // Multer places the file info on req.file
+    const photoLocalPath = req.file?.path; // Get the temporary path of the uploaded file
+
+    // req.teacher is populated by verifyJWT middleware
+    const teacherId = req.teacher._id; // Use Mongoose _id for update
+
+    if (!photoLocalPath) {
+        throw new ApiError(400, "Photo file is missing. Please select an image to upload.");
+    }
+
+    // Upload the file to Cloudinary
+    const cloudinaryResponse = await uploadOnCloudinary(photoLocalPath);
+
+    if (!cloudinaryResponse || !cloudinaryResponse.url) {
+        // uploadOnCloudinary already handles deleting the local file and throws ApiError for severe issues.
+        throw new ApiError(500, "Failed to upload photo to Cloudinary. Please try again.");
+    }
+
+    // Find the teacher and update their photo URL in the database
+    const teacher = await Teacher.findByIdAndUpdate(
+        teacherId,
+        {
+            $set: {
+                teacherPhotoUrl: cloudinaryResponse.url,
+                // If you stored public ID for deletion:
+                // teacherPhotoPublicId: cloudinaryResponse.public_id,
+            }
+        },
+        { new: true, runValidators: true } // Return updated doc, run schema validators
+    );
+
+    if (!teacher) {
+        throw new ApiError(404, "Teacher not found after photo upload (unexpected).");
+    }
+
+    return res.status(200).json(
+        new ApiResponse(200, {
+            teacherId: teacher.teacherId,
+            teacherPhotoUrl: teacher.teacherPhotoUrl,
+            message: "Teacher photo uploaded successfully!"
+        }, "Photo updated.")
+    );
+});
+
+
+
+export {addTeacher,loginTeacher,uploadTeacherPhoto,getCurrentTeacher}

@@ -24,9 +24,9 @@ const studentSchema = new mongoose.Schema({
     studentPhoto:{
         type: String
     },
-    studentPhoneNumber:{
+    studentEmail:{
         type: String,
-        required: true,
+        required:true
     },
     stu_attendence:[{
         date: { type: Date, default: Date.now },

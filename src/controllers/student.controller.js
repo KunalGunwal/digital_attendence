@@ -26,4 +26,9 @@ const addStudent  = asyncHandler(async (req,res)=>{
     )
 })
 
+const studentLogin = asyncHandler((req,res)=>{
+    const {studentId,password} = req.body
+    
+})
+
 export {addStudent}
